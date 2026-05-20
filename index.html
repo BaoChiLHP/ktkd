@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incoterms 2020 — Interactive Mind Map</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<!-- ============================================================
+     STYLES
+============================================================ -->
+<style>
+  /* ---- Reset & Base ---- */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #080c14;
+    --surface:   #0e1420;
+    --surface2:  #141b28;
+    --border:    rgba(255,255,255,.07);
+    --text:      #e8ecf4;
+    --muted:     #7a8499;
+
+    /* Branch colours */
+    --any:       #00c2ff;   /* Any Mode */
+    --sea:       #ff7d3b;   /* Sea Only */
+    --center:    #d4af37;   /* Centre node gold */
+
+    /* Individual term accents */
+    --exw: #4ade80;
+    --fca: #34d399;
+    --cpt: #22d3ee;
+    --cip: #38bdf8;
+    --dap: #818cf8;
+    --dpu: #a78bfa;
+    --ddp: #c084fc;
+    --fas: #fb923c;
+    --fob: #f97316;
+    --cfr: #ef4444;
+    --cif: #f43f5e;
+
+    --radius: 14px;
+    --glass: rgba(255,255,255,.035);
+    --shadow: 0 8px 40px rgba(0,0,0,.55);
+    --transition: .28s cubic-bezier(.4,0,.2,1);
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ---- Canvas wrapper ---- */
+  #canvas-wrap {
+    position: fixed; inset: 0;
+    cursor: grab;
+  }
+  #canvas-wrap.panning { cursor: grabbing; }
+  #mindmap-svg {
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  /* ---- Toolbar ---- */
+  #toolbar {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    padding: 8px 16px;
+    box-shadow: var(--shadow);
+    z-index: 100;
+    backdrop-filter: blur(20px);
+  }
+  #toolbar h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 700;
+    letter-spacing: .12em;
+    color: var(--center);
+    margin-right: 6px;
+    white-space: nowrap;
+  }
+  .tb-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 500;
+    letter-spacing: .05em;
+    padding: 5px 13px; border-radius: 30px;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+  }
+  .tb-btn:hover { background: #1e2738; color: var(--text); border-color: rgba(255,255,255,.15); }
+  .tb-sep { width: 1px; height: 22px; background: var(--border); }
+
+  /* ---- Legend ---- */
+  #legend {
+    position: fixed; bottom: 22px; left: 22px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    font-size: 11px;
+    box-shadow: var(--shadow);
+    z-index: 100;
+    min-width: 170px;
+  }
+  #legend h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .legend-label { color: var(--text); font-size: 11px; }
+
+  /* ---- Hint ---- */
+  #hint {
+    position: fixed; bottom: 22px; right: 22px;
+    color: var(--muted); font-size: 11px; text-align: right;
+    line-height: 1.8;
+    z-index: 100;
+  }
+
+  /* ---- SVG node styles ---- */
+  .node-group { cursor: pointer; }
+  .node-circle { transition: filter .2s, r .2s; }
+  .node-group:hover .node-circle { filter: brightness(1.35) drop-shadow(0 0 12px currentColor); }
+
+  /* ---- Side Panel ---- */
+  #panel {
+    position: fixed; top: 0; right: -480px;
+    width: 440px; height: 100%;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: -20px 0 60px rgba(0,0,0,.6);
+    z-index: 200;
+    overflow-y: auto;
+    transition: right .38s cubic-bezier(.4,0,.2,1);
+    display: flex; flex-direction: column;
+  }
+  #panel.open { right: 0; }
+
+  #panel-header {
+    padding: 28px 28px 20px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: var(--surface);
+    z-index: 2;
+  }
+  #panel-close {
+    position: absolute; top: 22px; right: 22px;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 18px; line-height: 32px; text-align: center;
+    cursor: pointer; transition: var(--transition);
+  }
+  #panel-close:hover { color: var(--text); background: #1e2738; }
+
+  #panel-abbr {
+    font-family: 'Syne', sans-serif;
+    font-size: 42px; font-weight: 800;
+    line-height: 1; margin-bottom: 4px;
+  }
+  #panel-fullname {
+    font-size: 14px; font-weight: 500; color: var(--muted);
+    margin-bottom: 8px;
+  }
+  #panel-badge {
+    display: inline-block;
+    padding: 3px 12px; border-radius: 30px;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase;
+  }
+  #panel-desc {
+    padding: 20px 28px;
+    font-size: 13px; color: var(--muted); line-height: 1.7;
+    border-bottom: 1px solid var(--border);
+  }
+  #panel-body { padding: 20px 28px; flex: 1; }
+  .info-section { margin-bottom: 22px; }
+  .info-section h4 {
+    font-family: 'Syne', sans-serif;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  .info-row {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-bottom: 8px; font-size: 12px; line-height: 1.6;
+  }
+  .info-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .info-text { color: var(--text); }
+
+  /* Risk bar */
+  .risk-bar-wrap { margin-top: 14px; }
+  .risk-bar-label {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--muted); margin-bottom: 6px;
+    letter-spacing: .04em;
+  }
+  .risk-track {
+    height: 6px; border-radius: 3px;
+    background: var(--surface2);
+    overflow: visible; position: relative;
+  }
+  .risk-fill {
+    height: 100%; border-radius: 3px;
+    transition: width .6s .1s cubic-bezier(.4,0,.2,1);
+  }
+  .risk-dot {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--surface);
+    transition: left .6s .1s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* Overlay backdrop */
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.35);
+    z-index: 150;
+    opacity: 0; pointer-events: none;
+    transition: opacity .3s;
+  }
+  #overlay.show { opacity: 1; pointer-events: all; }
+
+  /* ---- Tooltip ---- */
+  #tooltip {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 11px; line-height: 1.6;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .15s;
+    z-index: 300;
+    max-width: 220px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.5);
+  }
+  #tooltip.show { opacity: 1; }
+  #tooltip-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  #tooltip-sub { color: var(--muted); }
+
+  /* ---- Pulse ring on center node ---- */
+  @keyframes pulse {
+    0%   { r: 52; opacity: .4; }
+    100% { r: 68; opacity: 0; }
+  }
+  .pulse-ring { animation: pulse 2.4s ease-out infinite; }
+
+  /* ---- Entry animation ---- */
+  @keyframes fadeIn { from { opacity:0; transform: scale(.95); } to { opacity:1; transform: scale(1); } }
+  #mindmap-svg { animation: fadeIn .7s ease both; }
+
+  /* ---- Scrollbar ---- */
+  #panel::-webkit-scrollbar { width: 4px; }
+  #panel::-webkit-scrollbar-track { background: transparent; }
+  #panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ---- Mobile ---- */
+  @media (max-width: 600px) {
+    #panel { width: 100%; }
+    #toolbar h1 { display: none; }
+    .tb-btn { font-size: 10px; padding: 4px 10px; }
+    #legend { font-size: 10px; padding: 10px 14px; }
+    #hint { display: none; }
+  }
+</style>
+</head>
+
+<body>
+
+<!-- ============================================================
+     HTML STRUCTURE
+============================================================ -->
+
+<!-- Canvas -->
+<div id="canvas-wrap">
+  <svg id="mindmap-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <h1>⬡ INCOTERMS 2020</h1>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="resetView()">⟳ Reset View</button>
+  <button class="tb-btn" onclick="expandAll()">+ Expand All</button>
+  <button class="tb-btn" onclick="collapseAll()">− Collapse All</button>
+</div>
+
+<!-- Legend -->
+<div id="legend">
+  <h3>Categories</h3>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:var(--any)"></div>
+    <span class="legend-label">Any Mode of Transport</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:var(--sea)"></div>
+    <span class="legend-label">Sea &amp; Inland Waterway</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:var(--center)"></div>
+    <span class="legend-label">Centre</span>
+  </div>
+</div>
+
+<!-- Hint -->
+<div id="hint">
+  🖱 Drag to pan &nbsp;·&nbsp; Scroll to zoom<br>
+  Click a node for details
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip">
+  <div id="tooltip-title"></div>
+  <div id="tooltip-sub"></div>
+</div>
+
+<!-- Overlay -->
+<div id="overlay" onclick="closePanel()"></div>
+
+<!-- Side Panel -->
+<div id="panel">
+  <div id="panel-header">
+    <div id="panel-abbr"></div>
+    <div id="panel-fullname"></div>
+    <div id="panel-badge"></div>
+    <div id="panel-close" onclick="closePanel()">✕</div>
+  </div>
+  <div id="panel-desc"></div>
+  <div id="panel-body"></div>
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT
+============================================================ -->
+<script>
+/* ============================================================
+   DATA — All 11 Incoterms 2020 conditions
+============================================================ */
+const TERMS = {
+  // ── ANY MODE OF TRANSPORT ──────────────────────────────────
+  EXW: {
+    abbr: 'EXW',
+    fullname: 'Ex Works',
+    group: 'any',
+    color: 'var(--exw)',
+    icon: '🏭',
+    desc: 'The seller only needs to make goods available at their own premises (warehouse or factory). The buyer bears all costs and risks from the point of origin to the final destination.',
+    seller: [
+      'Prepare and package the goods',
+      'Notify buyer that goods are ready for collection',
+      'Provide commercial documentation for the goods',
+    ],
+    buyer: [
+      'Arrange domestic transport at the country of export',
+      'Complete export customs clearance',
+      'Pay all freight and transportation costs',
+      'Obtain cargo insurance',
+      'Complete import customs clearance',
+    ],
+    risk: 5,
+    riskLabel: 'At seller\'s premises',
+    freight: 'Buyer',
+    insurance: 'Buyer (not obligatory)',
+    transport: 'Any mode of transport',
+  },
+  FCA: {
+    abbr: 'FCA',
+    fullname: 'Free Carrier',
+    group: 'any',
+    color: 'var(--fca)',
+    icon: '🚛',
+    desc: 'The seller delivers goods to the carrier nominated by the buyer at an agreed location. The 2020 revision allows an "on board" bill of lading to be issued after delivery to the carrier.',
+    seller: [
+      'Deliver goods to the carrier at the agreed point',
+      'Complete export customs clearance',
+      'Package and label the goods',
+      'Provide export documentation',
+    ],
+    buyer: [
+      'Contract and pay for the main carriage',
+      'Obtain cargo insurance',
+      'Complete import customs clearance',
+      'Pay import duties and taxes',
+    ],
+    risk: 22,
+    riskLabel: 'When delivered to the named carrier',
+    freight: 'Buyer',
+    insurance: 'Buyer (not obligatory)',
+    transport: 'Any mode of transport',
+  },
+  CPT: {
+    abbr: 'CPT',
+    fullname: 'Carriage Paid To',
+    group: 'any',
+    color: 'var(--cpt)',
+    icon: '✈️',
+    desc: 'The seller pays freight to the named destination. However, risk transfers to the buyer when goods are handed to the first carrier — creating a split between the risk transfer point and the cost transfer point.',
+    seller: [
+      'Contract and pay freight to the named destination',
+      'Deliver goods to the first carrier',
+      'Complete export customs clearance',
+    ],
+    buyer: [
+      'Bears risk from the moment goods are handed to first carrier',
+      'Obtain cargo insurance',
+      'Complete import customs clearance',
+      'Pay unloading costs at destination',
+    ],
+    risk: 35,
+    riskLabel: 'When handed to the first carrier',
+    freight: 'Seller (to named destination)',
+    insurance: 'Buyer (not obligatory)',
+    transport: 'Any mode of transport',
+  },
+  CIP: {
+    abbr: 'CIP',
+    fullname: 'Carriage & Insurance Paid To',
+    group: 'any',
+    color: 'var(--cip)',
+    icon: '🛡️',
+    desc: 'Same as CPT but the seller is required to purchase insurance on behalf of the buyer. The 2020 revision upgraded the minimum coverage to Institute Cargo Clause A (all risks) — a significant improvement over the prior version.',
+    seller: [
+      'Pay freight to the named destination',
+      'Purchase insurance under Institute Cargo Clause A (all risks)',
+      'Deliver goods to the first carrier',
+      'Complete export customs clearance',
+    ],
+    buyer: [
+      'Bears risk from the moment goods are handed to first carrier',
+      'Complete import customs clearance',
+      'Pay unloading costs at destination',
+    ],
+    risk: 35,
+    riskLabel: 'When handed to the first carrier',
+    freight: 'Seller',
+    insurance: 'Seller (mandatory, Clause A)',
+    transport: 'Any mode of transport',
+  },
+  DAP: {
+    abbr: 'DAP',
+    fullname: 'Delivered At Place',
+    group: 'any',
+    color: 'var(--dap)',
+    icon: '📍',
+    desc: 'The seller is responsible for delivering goods to the named place of destination, ready for unloading. The buyer handles unloading costs and import customs procedures.',
+    seller: [
+      'Contract and pay all freight to the named destination',
+      'Bear all risks throughout the journey to destination',
+      'Complete export customs clearance',
+      'Provide delivery documentation',
+    ],
+    buyer: [
+      'Complete import customs clearance',
+      'Pay import duties, taxes and fees',
+      'Pay unloading costs at destination',
+    ],
+    risk: 80,
+    riskLabel: 'At named destination (before unloading)',
+    freight: 'Seller',
+    insurance: 'Seller (not obligatory)',
+    transport: 'Any mode of transport',
+  },
+  DPU: {
+    abbr: 'DPU',
+    fullname: 'Delivered at Place Unloaded',
+    group: 'any',
+    color: 'var(--dpu)',
+    icon: '🏗️',
+    desc: 'NEW in Incoterms 2020, replacing DAT. The seller is responsible for unloading goods at the named destination — this is the ONLY Incoterms rule that requires the seller to unload.',
+    seller: [
+      'Transport goods to the named destination',
+      'UNLOAD goods at destination (unique obligation)',
+      'Complete export customs clearance',
+      'Bear all risks until unloading is complete',
+    ],
+    buyer: [
+      'Complete import customs clearance',
+      'Pay import duties, taxes and fees',
+    ],
+    risk: 85,
+    riskLabel: 'After unloading at named destination',
+    freight: 'Seller',
+    insurance: 'Seller (not obligatory)',
+    transport: 'Any mode of transport',
+  },
+  DDP: {
+    abbr: 'DDP',
+    fullname: 'Delivered Duty Paid',
+    group: 'any',
+    color: 'var(--ddp)',
+    icon: '✅',
+    desc: 'The seller bears ALL responsibilities — from the factory to the buyer\'s door, including import customs clearance and duties. Maximum obligation for the seller; minimum obligation for the buyer.',
+    seller: [
+      'Transport goods to the buyer\'s named address',
+      'Complete BOTH export and import customs clearance',
+      'Pay all import duties, taxes and VAT',
+      'Unload goods at buyer\'s premises',
+      'Bear all risks and costs throughout',
+    ],
+    buyer: [
+      'Accept delivery at the named place',
+    ],
+    risk: 95,
+    riskLabel: 'At buyer\'s named place',
+    freight: 'Seller',
+    insurance: 'Seller (not obligatory)',
+    transport: 'Any mode of transport',
+  },
+
+  // ── SEA & INLAND WATERWAY ONLY ────────────────────────────
+  FAS: {
+    abbr: 'FAS',
+    fullname: 'Free Alongside Ship',
+    group: 'sea',
+    color: 'var(--fas)',
+    icon: '⚓',
+    desc: 'The seller delivers goods alongside the vessel at the named port of shipment. The buyer bears all risks and costs from that point, including loading onto the vessel.',
+    seller: [
+      'Place goods alongside the vessel at port of export',
+      'Complete export customs clearance',
+      'Bear risk until goods are placed alongside the ship',
+    ],
+    buyer: [
+      'Charter vessel and pay sea freight',
+      'Load goods onto the vessel',
+      'Obtain cargo insurance',
+      'Complete import customs clearance',
+    ],
+    risk: 18,
+    riskLabel: 'When goods are alongside the vessel',
+    freight: 'Buyer',
+    insurance: 'Buyer (not obligatory)',
+    transport: 'Sea & inland waterway only',
+  },
+  FOB: {
+    abbr: 'FOB',
+    fullname: 'Free On Board',
+    group: 'sea',
+    color: 'var(--fob)',
+    icon: '🚢',
+    desc: 'The most widely used term in international trade. Risk transfers to the buyer when goods pass the ship\'s rail (are on board) at the named port of shipment.',
+    seller: [
+      'Load goods on board the vessel at port of export',
+      'Complete export customs clearance',
+      'Bear risk until goods are on board',
+    ],
+    buyer: [
+      'Charter vessel and pay sea freight',
+      'Obtain cargo insurance',
+      'Complete import customs clearance',
+      'Pay costs at the port of destination',
+    ],
+    risk: 30,
+    riskLabel: 'When goods are on board at port of export',
+    freight: 'Buyer',
+    insurance: 'Buyer (not obligatory)',
+    transport: 'Sea & inland waterway only',
+  },
+  CFR: {
+    abbr: 'CFR',
+    fullname: 'Cost and Freight',
+    group: 'sea',
+    color: 'var(--cfr)',
+    icon: '📦',
+    desc: 'The seller pays sea freight to the named port of destination, but risk transfers to the buyer when goods are on board at the port of export. Cost and risk transfer at different points.',
+    seller: [
+      'Pay sea freight to the named destination port',
+      'Load goods on board the vessel at port of export',
+      'Complete export customs clearance',
+    ],
+    buyer: [
+      'Bears risk from the moment goods are on board',
+      'Obtain cargo insurance',
+      'Pay unloading costs at destination port',
+      'Complete import customs clearance',
+    ],
+    risk: 30,
+    riskLabel: 'When goods are on board at port of export',
+    freight: 'Seller (to named destination port)',
+    insurance: 'Buyer (not obligatory)',
+    transport: 'Sea & inland waterway only',
+  },
+  CIF: {
+    abbr: 'CIF',
+    fullname: 'Cost, Insurance and Freight',
+    group: 'sea',
+    color: 'var(--cif)',
+    icon: '🛳️',
+    desc: 'Same as CFR but the seller is required to purchase minimum cargo insurance for the buyer. Note: only Institute Cargo Clause C (minimum cover) is required. Risk still transfers when goods are on board.',
+    seller: [
+      'Pay sea freight to the named destination port',
+      'Purchase minimum insurance under Institute Cargo Clause C',
+      'Load goods on board the vessel at port of export',
+      'Complete export customs clearance',
+    ],
+    buyer: [
+      'Bears risk from the moment goods are on board',
+      'Pay unloading costs at destination port',
+      'Complete import customs clearance',
+    ],
+    risk: 30,
+    riskLabel: 'When goods are on board at port of export',
+    freight: 'Seller',
+    insurance: 'Seller (mandatory, Clause C)',
+    transport: 'Sea & inland waterway only',
+  },
+};
+
+/* ============================================================
+   LAYOUT — polar coordinates around centre
+============================================================ */
+const W  = () => Math.max(window.innerWidth,  800);
+const H  = () => Math.max(window.innerHeight, 600);
+const CX = () => W() / 2;
+const CY = () => H() / 2;
+
+function computeLayout() {
+  const cx = CX(), cy = CY();
+  const R1 = 195;
+  const R2 = 370;
+  const pos = {};
+
+  pos.CENTER  = { x: cx, y: cy };
+  pos.ANY_HUB = { x: cx - R1, y: cy - 15 };
+  pos.SEA_HUB = { x: cx + R1, y: cy + 10 };
+
+  // Any-mode leaves — fan left
+  const anyTerms  = ['EXW','FCA','CPT','CIP','DAP','DPU','DDP'];
+  const anyAngles = [-145, -115, -85, -60, -35, -5, 20];
+  anyTerms.forEach((t, i) => {
+    const rad = (anyAngles[i] * Math.PI) / 180;
+    pos[t] = { x: cx - R2 * Math.cos(rad + Math.PI * 0.08), y: cy + R2 * Math.sin(rad) };
+  });
+
+  // Sea leaves — fan right
+  const seaTerms  = ['FAS','FOB','CFR','CIF'];
+  const seaAngles = [-50, -15, 20, 55];
+  seaTerms.forEach((t, i) => {
+    const rad = (seaAngles[i] * Math.PI) / 180;
+    pos[t] = { x: cx + R2 * Math.cos(rad), y: cy + R2 * Math.sin(rad) };
+  });
+
+  return pos;
+}
+
+/* ============================================================
+   STATE
+============================================================ */
+let transform = { x: 0, y: 0, scale: 1 };
+let collapsed = { any: false, sea: false };
+let pos = {};
+
+/* ============================================================
+   SVG HELPERS
+============================================================ */
+const svg = document.getElementById('mindmap-svg');
+const NS  = 'http://www.w3.org/2000/svg';
+
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+/* ============================================================
+   RENDER
+============================================================ */
+function render() {
+  svg.innerHTML = '';
+  pos = computeLayout();
+
+  // Defs: gradients, filters
+  const defs = el('defs', {}, svg);
+
+  // Glow filter
+  const filter = el('filter', { id: 'glow', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
+  el('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: '4', result: 'blur' }, filter);
+  const merge = el('feMerge', {}, filter);
+  el('feMergeNode', { in: 'blur' }, merge);
+  el('feMergeNode', { in: 'SourceGraphic' }, merge);
+
+  // Gradient for centre node
+  const cg = el('radialGradient', { id: 'cg', cx: '50%', cy: '40%', r: '60%' }, defs);
+  el('stop', { offset: '0%',   'stop-color': '#ffe066' }, cg);
+  el('stop', { offset: '100%', 'stop-color': '#b8860b' }, cg);
+
+  // Main transform group
+  const g = el('g', { id: 'root-g', transform: `translate(${transform.x},${transform.y}) scale(${transform.scale})` }, svg);
+
+  // ── Edges ──────────────────────────────────────────────────
+  const edgeGroup = el('g', { id: 'edges' }, g);
+
+  drawEdge(edgeGroup, pos.CENTER, pos.ANY_HUB, '#00c2ff', 2.5, 'hub');
+  drawEdge(edgeGroup, pos.CENTER, pos.SEA_HUB, '#ff7d3b', 2.5, 'hub');
+
+  if (!collapsed.any)
+    ['EXW','FCA','CPT','CIP','DAP','DPU','DDP'].forEach(t =>
+      drawEdge(edgeGroup, pos.ANY_HUB, pos[t], TERMS[t].color, 1.5, 'leaf'));
+
+  if (!collapsed.sea)
+    ['FAS','FOB','CFR','CIF'].forEach(t =>
+      drawEdge(edgeGroup, pos.SEA_HUB, pos[t], TERMS[t].color, 1.5, 'leaf'));
+
+  // ── Nodes ─────────────────────────────────────────────────
+  const nodeGroup = el('g', { id: 'nodes' }, g);
+
+  drawCenter(nodeGroup, pos.CENTER);
+  drawHub(nodeGroup, pos.ANY_HUB, 'ANY MODE', '#00c2ff', 'any');
+  drawHub(nodeGroup, pos.SEA_HUB, 'SEA ONLY', '#ff7d3b', 'sea');
+
+  if (!collapsed.any)
+    ['EXW','FCA','CPT','CIP','DAP','DPU','DDP'].forEach(t => drawLeaf(nodeGroup, t));
+
+  if (!collapsed.sea)
+    ['FAS','FOB','CFR','CIF'].forEach(t => drawLeaf(nodeGroup, t));
+}
+
+/* -- Edge -- */
+function drawEdge(parent, from, to, color, width, type) {
+  const dx   = (to.x - from.x) * 0.45;
+  const path = el('path', {
+    d: `M${from.x},${from.y} C${from.x + dx},${from.y} ${to.x - dx},${to.y} ${to.x},${to.y}`,
+    fill: 'none',
+    stroke: color,
+    'stroke-width': width,
+    'stroke-opacity': type === 'hub' ? '.7' : '.45',
+    'stroke-dasharray': type === 'leaf' ? '6 4' : 'none',
+  }, parent);
+
+  if (type === 'leaf') {
+    const circle = el('circle', { r: 2.5, fill: color, opacity: '.9' }, parent);
+    const anim   = el('animateMotion', {
+      dur: (1.8 + Math.random() * 1.2) + 's',
+      repeatCount: 'indefinite',
+      calcMode: 'spline',
+      keySplines: '0.4 0 0.2 1',
+    }, circle);
+    const mp = el('mpath', {}, anim);
+    path.id  = 'ep_' + Math.random().toString(36).slice(2);
+    mp.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '#' + path.id);
+  }
+}
+
+/* -- Centre node -- */
+function drawCenter(parent, p) {
+  const g = el('g', { transform: `translate(${p.x},${p.y})` }, parent);
+
+  el('circle', {
+    r: 52, fill: 'none',
+    stroke: '#d4af37', 'stroke-width': 1.5, opacity: 0,
+    class: 'pulse-ring',
+  }, g);
+
+  el('circle', { r: 50, fill: 'url(#cg)', filter: 'url(#glow)' }, g);
+  el('circle', { r: 50, fill: 'none', stroke: '#d4af37', 'stroke-width': 1.5, opacity: .6 }, g);
+
+  const t1 = el('text', { 'text-anchor': 'middle', 'dominant-baseline': 'middle', y: -8,
+    fill: '#080c14', 'font-family': 'Syne, sans-serif', 'font-size': 11, 'font-weight': 800,
+    'letter-spacing': 2 }, g);
+  t1.textContent = 'INCOTERMS';
+
+  const t2 = el('text', { 'text-anchor': 'middle', 'dominant-baseline': 'middle', y: 8,
+    fill: '#080c14', 'font-family': 'Syne, sans-serif', 'font-size': 11, 'font-weight': 800,
+    'letter-spacing': 2 }, g);
+  t2.textContent = '2020';
+
+  const t3 = el('text', { 'text-anchor': 'middle', 'dominant-baseline': 'middle', y: 22,
+    fill: '#3a2a00', 'font-family': 'DM Sans, sans-serif', 'font-size': 8, 'font-weight': 400 }, g);
+  t3.textContent = '11 conditions';
+}
+
+/* -- Hub node -- */
+function drawHub(parent, p, label, color, key) {
+  const g = el('g', {
+    transform: `translate(${p.x},${p.y})`,
+    class: 'node-group',
+    style: 'cursor:pointer',
+  }, parent);
+
+  g.addEventListener('mouseenter', (e) => showTooltip(e, label, 'Click to collapse / expand'));
+  g.addEventListener('mouseleave', hideTooltip);
+  g.addEventListener('mousemove',  moveTooltip);
+  g.addEventListener('click', () => toggleBranch(key));
+
+  const hexR = 32;
+  const pts  = Array.from({ length: 6 }, (_, i) => {
+    const a = (Math.PI / 3) * i - Math.PI / 6;
+    return `${hexR * Math.cos(a)},${hexR * Math.sin(a)}`;
+  }).join(' ');
+
+  el('polygon', { points: pts, fill: color + '22', stroke: color, 'stroke-width': 2, filter: 'url(#glow)' }, g);
+
+  el('text', { 'text-anchor': 'middle', 'dominant-baseline': 'middle', y: -5,
+    fill: color, 'font-family': 'Syne, sans-serif', 'font-size': 8, 'font-weight': 700,
+    'letter-spacing': 1 }, g).textContent = label.split(' ')[0];
+
+  el('text', { 'text-anchor': 'middle', 'dominant-baseline': 'middle', y: 6,
+    fill: color, 'font-family': 'Syne, sans-serif', 'font-size': 8, 'font-weight': 700,
+    'letter-spacing': 1 }, g).textContent = label.split(' ').slice(1).join(' ');
+}
+
+/* -- Leaf node (term) -- */
+function drawLeaf(parent, key) {
+  const term = TERMS[key];
+  const p    = pos[key];
+  const g    = el('g', {
+    transform: `translate(${p.x},${p.y})`,
+    class: 'node-group',
+    'data-key': key,
+  }, parent);
+
+  el('circle', { r: 34, fill: 'none', stroke: term.color, 'stroke-width': 1,
+    opacity: .3, filter: 'url(#glow)' }, g);
+
+  const circle = el('circle', {
+    r: 29, fill: '#0e1420',
+    stroke: term.color, 'stroke-width': 2,
+    class: 'node-circle',
+    style: `color:${term.color}`,
+  }, g);
+
+  el('circle', { r: 29, fill: term.color, opacity: .1 }, g);
+
+  el('text', { 'text-anchor': 'middle', 'dominant-baseline': 'middle', y: -6,
+    'font-size': 14 }, g).textContent = term.icon;
+
+  el('text', { 'text-anchor': 'middle', 'dominant-baseline': 'middle', y: 9,
+    fill: term.color, 'font-family': 'Syne, sans-serif', 'font-size': 11, 'font-weight': 800 }, g
+  ).textContent = term.abbr;
+
+  g.addEventListener('mouseenter', (e) => {
+    showTooltip(e, `${term.icon} ${term.abbr}`, term.fullname);
+    circle.setAttribute('r', 32);
+  });
+  g.addEventListener('mouseleave', () => {
+    hideTooltip();
+    circle.setAttribute('r', 29);
+  });
+  g.addEventListener('mousemove', moveTooltip);
+  g.addEventListener('click', () => openPanel(key));
+}
+
+/* ============================================================
+   PANEL
+============================================================ */
+function openPanel(key) {
+  const term  = TERMS[key];
+  const panel = document.getElementById('panel');
+
+  document.getElementById('panel-abbr').textContent    = term.abbr;
+  document.getElementById('panel-abbr').style.color    = term.color;
+  document.getElementById('panel-fullname').textContent = term.fullname;
+
+  const badge = document.getElementById('panel-badge');
+  if (term.group === 'any') {
+    badge.textContent        = 'Any Mode of Transport';
+    badge.style.background   = 'rgba(0,194,255,.12)';
+    badge.style.color        = '#00c2ff';
+    badge.style.border       = '1px solid rgba(0,194,255,.3)';
+  } else {
+    badge.textContent        = 'Sea & Inland Waterway Only';
+    badge.style.background   = 'rgba(255,125,59,.12)';
+    badge.style.color        = '#ff7d3b';
+    badge.style.border       = '1px solid rgba(255,125,59,.3)';
+  }
+
+  document.getElementById('panel-desc').textContent = term.desc;
+
+  document.getElementById('panel-body').innerHTML = `
+    <!-- Risk transfer point -->
+    <div class="info-section">
+      <h4>Risk Transfer Point</h4>
+      <div class="info-row">
+        <span class="info-icon">⚡</span>
+        <span class="info-text">${term.riskLabel}</span>
+      </div>
+      <div class="risk-bar-wrap">
+        <div class="risk-bar-label">
+          <span>Seller bears risk</span>
+          <span>Buyer bears risk</span>
+        </div>
+        <div class="risk-track">
+          <div class="risk-fill" style="width:${term.risk}%; background:${term.color}; opacity:.6"></div>
+          <div class="risk-dot"  style="left:calc(${term.risk}% - 7px); background:${term.color}; box-shadow:0 0 8px ${term.color}"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seller obligations -->
+    <div class="info-section">
+      <h4>🟢 Seller's Obligations</h4>
+      ${term.seller.map(s => `<div class="info-row"><span class="info-icon">›</span><span class="info-text">${s}</span></div>`).join('')}
+    </div>
+
+    <!-- Buyer obligations -->
+    <div class="info-section">
+      <h4>🔵 Buyer's Obligations</h4>
+      ${term.buyer.map(s => `<div class="info-row"><span class="info-icon">›</span><span class="info-text">${s}</span></div>`).join('')}
+    </div>
+
+    <!-- Costs & Insurance -->
+    <div class="info-section">
+      <h4>💰 Costs &amp; Insurance</h4>
+      <div class="info-row"><span class="info-icon">🚚</span><span class="info-text"><b>Freight:</b> ${term.freight}</span></div>
+      <div class="info-row"><span class="info-icon">🛡️</span><span class="info-text"><b>Insurance:</b> ${term.insurance}</span></div>
+      <div class="info-row"><span class="info-icon">🌊</span><span class="info-text"><b>Transport mode:</b> ${term.transport}</span></div>
+    </div>
+  `;
+
+  panel.classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function closePanel() {
+  document.getElementById('panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+/* ============================================================
+   TOOLTIP
+============================================================ */
+const tooltip = document.getElementById('tooltip');
+const ttTitle = document.getElementById('tooltip-title');
+const ttSub   = document.getElementById('tooltip-sub');
+
+function showTooltip(e, title, sub) {
+  ttTitle.textContent = title;
+  ttSub.textContent   = sub;
+  tooltip.classList.add('show');
+  moveTooltip(e);
+}
+function hideTooltip()  { tooltip.classList.remove('show'); }
+function moveTooltip(e) {
+  const x = e.clientX + 14, y = e.clientY + 14;
+  const w = tooltip.offsetWidth,  h = tooltip.offsetHeight;
+  tooltip.style.left = (x + w > window.innerWidth  ? x - w - 20 : x) + 'px';
+  tooltip.style.top  = (y + h > window.innerHeight ? y - h - 20 : y) + 'px';
+}
+
+/* ============================================================
+   BRANCH TOGGLE
+============================================================ */
+function toggleBranch(key) { collapsed[key] = !collapsed[key]; render(); }
+function expandAll()        { collapsed.any = false; collapsed.sea = false; render(); }
+function collapseAll()      { collapsed.any = true;  collapsed.sea = true;  render(); }
+
+/* ============================================================
+   ZOOM & PAN
+============================================================ */
+const wrap = document.getElementById('canvas-wrap');
+let isPanning = false, panStart = { x:0, y:0 }, panOrigin = { x:0, y:0 };
+
+wrap.addEventListener('mousedown', e => {
+  if (e.target.closest('.node-group')) return;
+  isPanning = true; wrap.classList.add('panning');
+  panStart  = { x: e.clientX,  y: e.clientY  };
+  panOrigin = { x: transform.x, y: transform.y };
+});
+window.addEventListener('mousemove', e => {
+  if (!isPanning) return;
+  transform.x = panOrigin.x + e.clientX - panStart.x;
+  transform.y = panOrigin.y + e.clientY - panStart.y;
+  applyTransform();
+});
+window.addEventListener('mouseup', () => { isPanning = false; wrap.classList.remove('panning'); });
+
+// Touch pan
+wrap.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isPanning = true;
+    panStart  = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    panOrigin = { x: transform.x, y: transform.y };
+  }
+}, { passive: true });
+window.addEventListener('touchmove', e => {
+  if (!isPanning || e.touches.length !== 1) return;
+  transform.x = panOrigin.x + e.touches[0].clientX - panStart.x;
+  transform.y = panOrigin.y + e.touches[0].clientY - panStart.y;
+  applyTransform();
+}, { passive: true });
+window.addEventListener('touchend', () => { isPanning = false; });
+
+// Scroll zoom
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  const rect  = wrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  transform.x     = mx - (mx - transform.x) * delta;
+  transform.y     = my - (my - transform.y) * delta;
+  transform.scale = Math.min(2.5, Math.max(0.3, transform.scale * delta));
+  applyTransform();
+}, { passive: false });
+
+function applyTransform() {
+  const g = document.getElementById('root-g');
+  if (g) g.setAttribute('transform', `translate(${transform.x},${transform.y}) scale(${transform.scale})`);
+}
+
+function resetView() {
+  transform = { x: 0, y: 0, scale: 1 };
+  applyTransform();
+}
+
+/* ============================================================
+   RESIZE & INIT
+============================================================ */
+window.addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>
